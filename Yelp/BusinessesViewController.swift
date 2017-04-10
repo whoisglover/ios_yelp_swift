@@ -8,11 +8,12 @@
 
 import UIKit
 
-class BusinessesViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+class BusinessesViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, UISearchControllerDelegate, UISearchBarDelegate, FiltersViewControllerDelegate {
     
     var businesses: [Business]!
     
     @IBOutlet weak var tableView: UITableView!
+    var searchController: UISearchController!
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -22,7 +23,17 @@ class BusinessesViewController: UIViewController, UITableViewDataSource, UITable
         tableView.estimatedRowHeight = 120
         
         
-        Business.searchWithTerm(term: "Thai", completion: { (businesses: [Business]?, error: Error?) -> Void in
+        
+        let searchBar = UISearchBar()
+        searchBar.autoresizingMask = UIViewAutoresizing.flexibleRightMargin
+        searchBar.backgroundColor = UIColor.clear
+        searchBar.tintColor = UIColor.red
+        searchBar.delegate = self
+        
+        self.navigationItem.titleView = searchBar
+        
+        
+        Business.searchWithTerm(term: "restaurant", completion: { (businesses: [Business]?, error: Error?) -> Void in
             
             self.businesses = businesses
             self.tableView.reloadData()
@@ -65,8 +76,75 @@ class BusinessesViewController: UIViewController, UITableViewDataSource, UITable
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "BusinessCell", for: indexPath) as! BusinessCell
         
+        
+        cell.row = indexPath.row
         cell.business = businesses[indexPath.row]
+        
      
         return cell
     }
+    
+    func searchWithTerm(term: String) {
+        Business.searchWithTerm(term: term, completion: { (businesses: [Business]?, error: Error?) -> Void in
+            
+            self.businesses = businesses
+            self.tableView.reloadData()
+            if let businesses = businesses {
+                for business in businesses {
+                    print(business.name!)
+                    print(business.address!)
+                }
+            }
+            
+        }
+        )
+        tableView.reloadData()
+    }
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        if let term = searchBar.text {
+            searchWithTerm(term: term)
+        }
+        searchBar.resignFirstResponder()
+    }
+    func searchBarTextDidEndEditing(_ searchBar: UISearchBar) {
+        if let term = searchBar.text {
+            searchWithTerm(term: term)
+        }
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        searchWithTerm(term: searchText)
+    }
+    
+    func filtersViewController(filtersViewController: FiltersViewController, didUpdateFilters filters: [String: AnyObject]) {
+        
+        var categories = filters["categories"] as? [String]
+        
+        
+        Business.searchWithTerm(term: "food", sort: nil, categories: categories, deals: nil, completion: {
+            (businesses: [Business]?, error: Error?) -> Void in
+                self.businesses = businesses
+                self.tableView.reloadData()
+
+        
+        })
+        
+//        Business.searchWithTerm(term: "restauraunts", sort: nil, categories: categories, deals: nil) {
+//            (businesses: [Business]!, error: NSError!) -> Void in
+//            self.businesses = businesses
+//            self.tableView.reloadData()
+//        
+//        } as! ([Business]?, Error?) -> Void as! ([Business]?, Error?) -> Void
+        print("delegate fired in Business VC")
+    
+    }
+    
+    override func prepare(for segue: UIStoryboardSegue, sender: Any?) {
+        let navigationController = segue.destination as! UINavigationController
+        let filtersViewController = navigationController.topViewController as! FiltersViewController
+        
+        filtersViewController.delegate = self
+    }
+    
 }
