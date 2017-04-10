@@ -13,21 +13,42 @@ import UIKit
     
 } 
 
-class FiltersViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, SwitchCellDelegate {
+class FiltersViewController: UIViewController, UITableViewDataSource, UITableViewDelegate, SwitchCellDelegate, DealCellDelegate {
 
     @IBOutlet weak var filterTableView: UITableView!
     weak var delegate: FiltersViewControllerDelegate?
     
     
     var categories: [[String: String]]!
+    var distances: [[String : String]]!
     var switchStates = [Int: Bool]()
+    var sortStates: [[String : String]]!
+    var filters = [String : AnyObject]()
+    let filterStore = [String: AnyObject]()
+    
+    var dealState = false
+    
+    var searchDistance = 3200
+    var searchDisanceString = "5.0 Miles"
+    var searchDistanceSelected = false
+    
+    var currentSort = 0
+    var currentSortString = "Best Match"
+    var currentSortSelected = false
+    
     
     override func viewDidLoad() {
         super.viewDidLoad()
         categories = yelpCategories()
+        distances = yelpDistances()
+        sortStates = yelpSorts()
+        
         filterTableView.delegate = self
         filterTableView.dataSource = self
-        
+        print("filters: \(filters)")
+        if filters["offeringDeal"] as? Int == 1 {
+            dealState = true
+        }
         
         // Do any additional setup after loading the view.
     }
@@ -41,7 +62,7 @@ class FiltersViewController: UIViewController, UITableViewDataSource, UITableVie
     @IBAction func onSearch(_ sender: Any) {
         
         
-        var filters = [String : AnyObject]()
+        
         
         var selectedCategories = [String]()
         
@@ -55,29 +76,118 @@ class FiltersViewController: UIViewController, UITableViewDataSource, UITableVie
             filters["categories"] = selectedCategories as AnyObject
         }
         
+        filters["offeringDeal"] = dealState as AnyObject
+        
+        filters["distance"] = searchDistance as AnyObject
+        
+        filters["sortBy"] = currentSort as AnyObject
+        
+        
         delegate?.filtersViewController!(filtersViewController: self, didUpdateFilters: filters)
         
         dismiss(animated: true, completion: nil)
         
     }
     
+    func numberOfSections(in tableView: UITableView) -> Int {
+        return 4
+    }
+    
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        if categories != nil {
+        switch section {
+        case 0:
+            return 1
+        case 1:
+            return searchDistanceSelected ?  distances.count : 1
+        case 2:
+            return currentSortSelected ? sortStates.count : 1
+        default:
             return categories.count
-        } else {
-            return 0
+            
+        
         }
     }
     
+    func tableView(_ tableView: UITableView, titleForHeaderInSection section: Int) -> String? {
+        switch section {
+        case 0:
+            return "Deal"
+        case 1:
+            return "Distance"
+        case 2:
+            return "Sort By"
+        default:
+            return "Categories"
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        if (indexPath.section == 1) {
+            if (searchDistanceSelected) {
+                searchDistance = Int(distances[indexPath.row]["meters"]!)!
+                searchDisanceString = distances[indexPath.row]["name"]!
+                searchDistanceSelected = false
+                tableView.reloadSections(IndexSet(integer: 1), with: UITableViewRowAnimation.fade)
+            } else {
+                searchDistanceSelected = true
+                tableView.reloadSections(IndexSet(integer: 1), with: UITableViewRowAnimation.fade)
+            }
+        } else if indexPath.section == 2 {
+            if(currentSortSelected) {
+                currentSort = Int(sortStates[indexPath.row]["enum"]!)!
+                currentSortString = sortStates[indexPath.row]["name"]!
+                currentSortSelected = false
+                tableView.reloadSections(IndexSet(integer: 2), with: UITableViewRowAnimation.fade)
+            } else {
+                currentSortSelected = true
+                tableView.reloadSections(IndexSet(integer: 2), with: UITableViewRowAnimation.fade)
+            }
+        
+        }
+    }
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = filterTableView.dequeueReusableCell(withIdentifier: "SwitchCell", for: indexPath) as! SwitchCell
-        
-        cell.switchLabel.text = categories[indexPath.row]["name"]
-        cell.delegate = self
-        
-        cell.onSwitch.isOn = switchStates[indexPath.row] ?? false
-        
-        return cell
+        switch indexPath.section {
+        case 0:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "DealCell", for: indexPath) as! DealCell
+            cell.delegate = self
+            cell.onSwitch.isOn = dealState
+            return cell
+        case 1:
+            let cell = tableView.dequeueReusableCell(withIdentifier: "DistanceCell", for: indexPath) as! DistanceCell
+            if indexPath.row == 0 && !searchDistanceSelected {
+                cell.distanceLabel.text = searchDisanceString
+                cell.selectedImageView.image = UIImage(named: "selected")
+            } else {
+                cell.distanceLabel.text = distances[indexPath.row]["name"]
+                cell.selectedImageView.image = UIImage(named: "notselected")
+            }
+            
+            return cell
+        case 2:
+             let cell = tableView.dequeueReusableCell(withIdentifier: "SortByCell", for: indexPath) as! SortByCell
+             if indexPath.row == 0 && !currentSortSelected {
+                cell.sortByLabel.text = currentSortString
+                cell.isSelectedImageView.image = UIImage(named: "selected")
+             } else {
+                cell.sortByLabel.text = sortStates[indexPath.row]["name"]
+                cell.isSelectedImageView.image = UIImage(named: "notselected")
+             }
+             return cell
+        default:
+            let cell = filterTableView.dequeueReusableCell(withIdentifier: "SwitchCell", for: indexPath) as! SwitchCell
+            cell.switchLabel.text = categories[indexPath.row]["name"]
+            cell.delegate = self
+            cell.onSwitch.isOn = switchStates[indexPath.row] ?? false
+            
+            return cell
+        }
+    }
+    
+    func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
+        return 35
+    }
+    func dealCell(dealCell: DealCell, didChangeValue value: Bool) {
+        dealState = value
     }
     
     func switchCell(switchCell: SwitchCell, didChangeValue value: Bool) {
@@ -86,6 +196,19 @@ class FiltersViewController: UIViewController, UITableViewDataSource, UITableVie
         
     }
     
+    func yelpSorts() -> [[String:String]] {
+        return [["name" : "Best Match", "enum" : "0"],
+                ["name" : "Distance", "enum" : "1"],
+                ["name" : "Highest Rated", "enum" : "2"]]
+    }
+    
+    func yelpDistances() -> [[String:String]] {
+        return [["name" : "0.5 miles", "meters" : "800"],
+                ["name" : "1 mile", "meters" : "1600"],
+                ["name" : "2 miles", "meters" : "3200"],
+                ["name" : "5 miles", "meters" : "8000"],
+                ["name" : "10 miles", "meters" : "16000"]]
+    }
     
     func yelpCategories() -> [[String: String]] {
         return [["name" : "Afghan", "code": "afghani"],

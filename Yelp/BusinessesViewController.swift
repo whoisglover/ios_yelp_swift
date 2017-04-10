@@ -12,8 +12,12 @@ class BusinessesViewController: UIViewController, UITableViewDataSource, UITable
     
     var businesses: [Business]!
     
+    let yelpRed = UIColor(red: 196.0 / 255.0, green: 18.0 / 255.0, blue: 0.0, alpha: 1.0)
+    
     @IBOutlet weak var tableView: UITableView!
     var searchController: UISearchController!
+    let searchBar = UISearchBar()
+    var filterStore = [String: AnyObject]()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -24,11 +28,17 @@ class BusinessesViewController: UIViewController, UITableViewDataSource, UITable
         
         
         
-        let searchBar = UISearchBar()
+        
         searchBar.autoresizingMask = UIViewAutoresizing.flexibleRightMargin
         searchBar.backgroundColor = UIColor.clear
         searchBar.tintColor = UIColor.red
         searchBar.delegate = self
+        
+        if let navigationBar = navigationController?.navigationBar {
+            navigationBar.barTintColor = yelpRed
+            navigationBar.tintColor = UIColor.white
+        }
+        
         
         self.navigationItem.titleView = searchBar
         
@@ -119,23 +129,21 @@ class BusinessesViewController: UIViewController, UITableViewDataSource, UITable
     
     func filtersViewController(filtersViewController: FiltersViewController, didUpdateFilters filters: [String: AnyObject]) {
         
-        var categories = filters["categories"] as? [String]
+        filterStore = filters
         
+        let categories = filters["categories"] as? [String]
+        let dealState = filters["offeringDeal"] as? Bool
+        let distance = filters["distance"] as? Int
+        let sortByInt = filters["sortBy"] as? Int ?? 0
+        let sortBy = YelpSortMode(rawValue: sortByInt)
+        let term = searchBar.text ?? ""
         
-        Business.searchWithTerm(term: "food", sort: nil, categories: categories, deals: nil, completion: {
+        Business.searchWithTerm(term: term, sort: sortBy, categories: categories, deals: dealState, distance: distance, completion: {
             (businesses: [Business]?, error: Error?) -> Void in
                 self.businesses = businesses
                 self.tableView.reloadData()
-
-        
         })
-        
-//        Business.searchWithTerm(term: "restauraunts", sort: nil, categories: categories, deals: nil) {
-//            (businesses: [Business]!, error: NSError!) -> Void in
-//            self.businesses = businesses
-//            self.tableView.reloadData()
-//        
-//        } as! ([Business]?, Error?) -> Void as! ([Business]?, Error?) -> Void
+
         print("delegate fired in Business VC")
     
     }
@@ -144,7 +152,9 @@ class BusinessesViewController: UIViewController, UITableViewDataSource, UITable
         let navigationController = segue.destination as! UINavigationController
         let filtersViewController = navigationController.topViewController as! FiltersViewController
         
+        filtersViewController.filters = filterStore
         filtersViewController.delegate = self
+        
     }
     
 }
